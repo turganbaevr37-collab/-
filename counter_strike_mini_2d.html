@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Counter-Strike 2D: Ultimate Dust Edition</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            background-color: #0b0d10;
+        }
+
+        .cs-font {
+            font-family: 'Black Ops One', cursive, sans-serif;
+        }
+
+        canvas {
+            cursor: crosshair;
+        }
+
+        /* Scope overlay effect for Snipers */
+        .sniper-scope {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: radial-gradient(circle at center, transparent 28%, rgba(0,0,0,0.96) 30%);
+            display: none;
+        }
+
+        .sniper-scope::before, .sniper-scope::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 0, 0, 0.7);
+        }
+
+        .sniper-scope::before {
+            top: 0; left: 50%; width: 1px; height: 100%; transform: translateX(-50%);
+        }
+
+        .sniper-scope::after {
+            top: 50%; left: 0; width: 100%; height: 1px; transform: translateY(-50%);
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-45px) scale(1.1); }
+        }
+        
+        .floating-text {
+            animation: floatUp 0.8s ease-out forwards;
+            position: absolute;
+            pointer-events: none;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+        }
+
+        /* Custom scrollbar for shop */
+        .shop-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .shop-scroll::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .shop-scroll::-webkit-scrollbar-thumb {
+            background: #d97706;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col justify-center items-center bg-gray-950 text-white p-2">
+
+    <!-- Game Outer Wrapper -->
+    <div class="relative w-full max-w-6xl h-full max-h-[760px] bg-slate-900 shadow-2xl rounded-xl overflow-hidden border-2 border-amber-600/40 flex flex-col">
+        
+        <!-- Header / Stats Bar -->
+        <div class="bg-gray-950 border-b border-amber-600/40 px-4 py-2 flex justify-between items-center z-10 select-none flex-wrap gap-2">
+            <div class="flex items-center gap-4 md:gap-6 flex-wrap">
+                <span class="cs-font text-amber-500 text-lg md:text-xl tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-crosshairs text-amber-400"></i> CS DUST 2D
+                </span>
+                
+                <!-- Health -->
+                <div class="flex items-center gap-2 bg-gray-900 px-3 py-1 rounded-md border border-red-500/40">
+                    <i class="fa-solid fa-heart text-red-500"></i>
+                    <span id="health-val" class="font-black text-red-400 text-base md:text-lg">100</span>
+                </div>
+
+                <!-- Money -->
+                <div class="flex items-center gap-2 bg-gray-900 px-3 py-1 rounded-md border border-green-500/40">
+                    <i class="fa-solid fa-dollar-sign text-green-400"></i>
+                    <span id="money-val" class="font-black text-green-400 text-base md:text-lg">800</span>
+                </div>
+
+                <!-- Score -->
+                <div class="flex items-center gap-2 bg-gray-900 px-3 py-1 rounded-md border border-amber-500/40">
+                    <i class="fa-solid fa-trophy text-amber-400"></i>
+                    <span id="score-val" class="font-black text-amber-300 text-base md:text-lg">0</span>
+                </div>
+            </div>
+
+            <!-- Ammo & Reload & Shop Button -->
+            <div class="flex items-center gap-3">
+                <div class="text-right">
+                    <div id="weapon-name" class="text-xs text-amber-400 uppercase tracking-widest font-black">GLOCK-18</div>
+                    <div class="flex items-center justify-end gap-1">
+                        <i class="fa-solid fa-burst text-amber-400 text-xs"></i>
+                        <span id="ammo-val" class="cs-font text-xl md:text-2xl text-amber-300">20</span>
+                        <span class="text-gray-500 text-xs">/ <span id="max-ammo-val">20</span></span>
+                    </div>
+                </div>
+
+                <button id="reload-btn" onclick="reloadWeapon()" class="bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-black font-extrabold px-3 py-1.5 rounded-lg text-xs transition flex flex-col items-center justify-center shadow">
+                    <i class="fa-solid fa-rotate-right text-sm"></i>
+                    <span>(R)</span>
+                </button>
+
+                <button id="shop-toggle-btn" onclick="toggleShop()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black px-4 py-2 rounded-lg text-xs md:text-sm transition flex items-center gap-2 shadow-lg border border-emerald-400/30">
+                    <i class="fa-solid fa-cart-shopping text-amber-300"></i>
+                    <span>ДҮКЕН (B)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="relative flex-1 bg-amber-100 overflow-hidden" id="canvas-container">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+            
+            <!-- Sniper Scope overlay -->
+            <div id="sniper-scope-layer" class="sniper-scope"></div>
+
+            <!-- Floating text overlay container -->
+            <div id="floating-container" class="absolute inset-0 pointer-events-none"></div>
+
+            <!-- SHOP MODAL OVERLAY -->
+            <div id="shop-overlay" class="absolute inset-0 bg-black/85 backdrop-blur-md z-30 hidden flex flex-col justify-center items-center p-4">
+                <div class="bg-gray-900 border-2 border-amber-500/80 rounded-2xl max-w-4xl w-full h-[88%] flex flex-col shadow-2xl overflow-hidden relative">
+                    
+                    <!-- Shop Header -->
+                    <div class="bg-gray-950 px-6 py-4 border-b border-gray-800 flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-store text-amber-400 text-2xl"></i>
+                            <div>
+                                <h2 class="cs-font text-xl md:text-2xl text-amber-400 tracking-wide">ҚАРУ-ЖАРАҚ ДҮКЕНІ</h2>
+                                <p class="text-gray-400 text-xs">Категорияны таңдап, қару сатып алыңыз немесе ауыстырыңыз</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-4">
+                            <div class="bg-gray-800 border border-green-500/50 px-4 py-1.5 rounded-lg text-right">
+                                <div class="text-[10px] text-gray-400 uppercase font-bold">Баланс:</div>
+                                <div class="text-green-400 font-black text-lg leading-none" id="shop-money-display">$800</div>
+                            </div>
+                            <button onclick="toggleShop()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg p-2 transition">
+                                <i class="fa-solid fa-xmark text-xl"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Category Tabs Filter -->
+                    <div class="bg-gray-950/70 border-b border-gray-800 px-6 py-2 flex gap-2 overflow-x-auto" id="category-tabs">
+                        <button onclick="filterShopCategory('all')" class="cat-btn active bg-amber-500 text-black font-extrabold px-4 py-1.5 rounded-md text-xs transition">Барлығы</button>
+                        <button onclick="filterShopCategory('pistol')" class="cat-btn bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-4 py-1.5 rounded-md text-xs transition">Тапаншалар</button>
+                        <button onclick="filterShopCategory('smg')" class="cat-btn bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-4 py-1.5 rounded-md text-xs transition">Пистолет-пулеметтер</button>
+                        <button onclick="filterShopCategory('rifle')" class="cat-btn bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-4 py-1.5 rounded-md text-xs transition">Автоматтар</button>
+                        <button onclick="filterShopCategory('sniper')" class="cat-btn bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-4 py-1.5 rounded-md text-xs transition">Снайперлер</button>
+                        <button onclick="filterShopCategory('heavy')" class="cat-btn bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-4 py-1.5 rounded-md text-xs transition">Ауыр қарулар</button>
+                    </div>
+
+                    <!-- Shop Items Grid -->
+                    <div class="flex-1 p-6 overflow-y-auto shop-scroll grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="shop-items-container">
+                        <!-- Items rendered by JavaScript -->
+                    </div>
+
+                    <!-- Shop Footer -->
+                    <div class="bg-gray-950 px-6 py-3 border-t border-gray-800 flex justify-between items-center text-xs text-gray-400">
+                        <div><i class="fa-solid fa-keyboard text-amber-400"></i> Жылдам ауыстыру: Пернетақтадағы <b>1, 2, 3... 9</b> батырмаларын басыңыз</div>
+                        <button onclick="toggleShop()" class="bg-amber-500 hover:bg-amber-400 text-black font-extrabold px-6 py-2 rounded-lg transition shadow">
+                            Майданға оралу (ESC/B)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start / Game Over Screen Overlay -->
+            <div id="game-modal" class="absolute inset-0 bg-black/85 z-40 flex flex-col justify-center items-center p-6 text-center">
+                <div class="max-w-md w-full bg-gray-900 border-2 border-amber-500/80 rounded-2xl p-8 shadow-2xl">
+                    <h1 id="modal-title" class="cs-font text-4xl text-amber-500 mb-2 tracking-wider">CS DUST 2D</h1>
+                    <p id="modal-desc" class="text-gray-300 text-sm mb-6">Лаңкестерге қарсы соғысыңыз! Ақша жинап, ең мықты қаруларды дүкеннен сатып алыңыз!</p>
+                    
+                    <div id="final-stats" class="hidden bg-gray-800/80 rounded-xl p-4 mb-6 border border-gray-700 text-left space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Жинаған ұпай:</span>
+                            <span id="stat-score" class="font-bold text-amber-400">0</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Жойылған лаңкестер:</span>
+                            <span id="stat-kills" class="font-bold text-red-400">0</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Тапқан ақшаңыз:</span>
+                            <span id="stat-money" class="font-bold text-green-400">$0</span>
+                        </div>
+                    </div>
+
+                    <button id="start-btn" onclick="startGame()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-black font-black text-lg py-3 rounded-xl shadow-xl transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> ОЙЫНДЫ БАСТАУ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer / Controls info bar -->
+        <div class="bg-gray-950 px-4 py-2 border-t border-gray-800 text-xs text-gray-400 flex justify-between items-center flex-wrap gap-2">
+            <div>
+                <span class="text-amber-400 font-bold">Басқару:</span> Көздеп ату - Тінтуір | <span class="text-white font-bold">R</span> - Оқтау | <span class="text-white font-bold">B</span> - Дүкен | <span class="text-white font-bold">1-9</span> - Қару таңдау
+            </div>
+            <div>
+                <span class="text-gray-500 font-mono">CS Mini 2D v3.0 - Expanded Shop Edition</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- AUDIO SYNTHESIZER SOUND SYSTEM (Web Audio API) -->
+    <script>
+        const AudioSys = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playShoot(type) {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                if (type === 'pistol') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(320, now);
+                    osc.frequency.exponentialRampToValueAtTime(40, now + 0.12);
+                    gain.gain.setValueAtTime(0.35, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(now); osc.stop(now + 0.12);
+                } else if (type === 'heavy_pistol') { // Deagle
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.exponentialRampToValueAtTime(15, now + 0.28);
+                    gain.gain.setValueAtTime(0.7, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(now); osc.stop(now + 0.28);
+                } else if (type === 'smg') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(450, now);
+                    osc.frequency.exponentialRampToValueAtTime(60, now + 0.08);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(now); osc.stop(now + 0.08);
+                } else if (type === 'rifle') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(360, now);
+                    osc.frequency.exponentialRampToValueAtTime(30, now + 0.14);
+                    gain.gain.setValueAtTime(0.5, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(now); osc.stop(now + 0.14);
+                } else if (type === 'sniper') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(140, now);
+                    osc.frequency.exponentialRampToValueAtTime(10, now + 0.55);
+                    gain.gain.setValueAtTime(0.95, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(now); osc.stop(now + 0.55);
+                } else if (type === 'shotgun') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(200, now);
+                    osc.frequency.exponentialRampToValueAtTime(20, now + 0.35);
+                    gain.gain.setValueAtTime(0.8, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(now); osc.stop(now + 0.35);
+                }
+            },
+            playReload() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.linearRampToValueAtTime(850, now + 0.18);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.18);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(now); osc.stop(now + 0.18);
+            },
+            playHit() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(320, now + 0.08);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(now); osc.stop(now + 0.08);
+            }
+        };
+    </script>
+
+    <!-- GAME ENGINE CODE -->
+    <script>
+        // Game Setup Variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+
+        let isPlaying = false;
+        let score = 0;
+        let money = 800;
+        let health = 100;
+        let totalKills = 0;
+        let totalEarned = 800;
+        
+        let lastTime = 0;
+        let spawnTimer = 0;
+        let spawnInterval = 1500;
+
+        let activeCategoryFilter = 'all';
+
+        // WEAPONS DATABASE WITH EXTENSIVE TYPES
+        const WEAPONS = {
+            // PISTOLS
+            glock: {
+                id: 'glock', name: 'Glock-18', category: 'pistol', price: 0, damage: 32, maxAmmo: 20, currentAmmo: 20,
+                fireRate: 180, reloadTime: 1100, automatic: false, bought: true, key: '1', audio: 'pistol', isPellet: false
+            },
+            usp: {
+                id: 'usp', name: 'USP-S', category: 'pistol', price: 200, damage: 38, maxAmmo: 12, currentAmmo: 12,
+                fireRate: 200, reloadTime: 1200, automatic: false, bought: false, key: '2', audio: 'pistol', isPellet: false
+            },
+            dual_berettas: {
+                id: 'dual_berettas', name: 'Dual Berettas', category: 'pistol', price: 400, damage: 34, maxAmmo: 30, currentAmmo: 30,
+                fireRate: 130, reloadTime: 1400, automatic: false, bought: false, key: '3', audio: 'pistol', isPellet: false
+            },
+            deagle: {
+                id: 'deagle', name: 'Desert Eagle', category: 'pistol', price: 700, damage: 88, maxAmmo: 7, currentAmmo: 7,
+                fireRate: 340, reloadTime: 1500, automatic: false, bought: false, key: '4', audio: 'heavy_pistol', isPellet: false
+            },
+
+            // SUBMACHINE GUNS (SMG)
+            mp5: {
+                id: 'mp5', name: 'MP5-SD', category: 'smg', price: 1500, damage: 42, maxAmmo: 30, currentAmmo: 30,
+                fireRate: 105, reloadTime: 1600, automatic: true, bought: false, key: '5', audio: 'smg', isPellet: false
+            },
+            p90: {
+                id: 'p90', name: 'P90', category: 'smg', price: 2350, damage: 36, maxAmmo: 50, currentAmmo: 50,
+                fireRate: 85, reloadTime: 1800, automatic: true, bought: false, key: '6', audio: 'smg', isPellet: false
+            },
+
+            // RIFLES
+            galil: {
+                id: 'galil', name: 'Galil AR', category: 'rifle', price: 1800, damage: 52, maxAmmo: 35, currentAmmo: 35,
+                fireRate: 120, reloadTime: 1900, automatic: true, bought: false, key: '7', audio: 'rifle', isPellet: false
+            },
+            famas: {
+                id: 'famas', name: 'FAMAS', category: 'rifle', price: 2050, damage: 50, maxAmmo: 25, currentAmmo: 25,
+                fireRate: 110, reloadTime: 1800, automatic: true, bought: false, key: '8', audio: 'rifle', isPellet: false
+            },
+            ak47: {
+                id: 'ak47', name: 'AK-47', category: 'rifle', price: 2700, damage: 68, maxAmmo: 30, currentAmmo: 30,
+                fireRate: 115, reloadTime: 2000, automatic: true, bought: false, key: '9', audio: 'rifle', isPellet: false
+            },
+            m4a4: {
+                id: 'm4a4', name: 'M4A4', category: 'rifle', price: 3100, damage: 62, maxAmmo: 30, currentAmmo: 30,
+                fireRate: 100, reloadTime: 1900, automatic: true, bought: false, key: '0', audio: 'rifle', isPellet: false
+            },
+
+            // SNIPERS
+            scout: {
+                id: 'scout', name: 'SSG 08 (Scout)', category: 'sniper', price: 1700, damage: 130, maxAmmo: 10, currentAmmo: 10,
+                fireRate: 850, reloadTime: 2100, automatic: false, bought: false, isSniper: true, audio: 'sniper', isPellet: false
+            },
+            awp: {
+                id: 'awp', name: 'AWP', category: 'sniper', price: 4750, damage: 300, maxAmmo: 5, currentAmmo: 5,
+                fireRate: 1250, reloadTime: 2500, automatic: false, bought: false, isSniper: true, audio: 'sniper', isPellet: false
+            },
+
+            // HEAVY & SHOTGUNS
+            xm1014: {
+                id: 'xm1014', name: 'XM1014 Shotgun', category: 'heavy', price: 2000, damage: 25, maxAmmo: 7, currentAmmo: 7,
+                fireRate: 380, reloadTime: 2200, automatic: false, bought: false, isPellet: true, pellets: 6, audio: 'shotgun'
+            },
+            negev: {
+                id: 'negev', name: 'Negev LMG', category: 'heavy', price: 3300, damage: 45, maxAmmo: 150, currentAmmo: 150,
+                fireRate: 70, reloadTime: 3200, automatic: true, bought: false, audio: 'rifle', isPellet: false
+            }
+        };
+
+        let activeWeaponKey = 'glock';
+        let isReloading = false;
+        let lastShotTime = 0;
+        let isMouseDown = false;
+        let mousePos = { x: 0, y: 0 };
+
+        // Game Collections
+        let enemies = [];
+        let particles = [];
+        let muzzleFlashes = [];
+        let covers = [];
+
+        function resizeCanvas() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            setupMapCovers();
+        }
+
+        function setupMapCovers() {
+            const w = canvas.width;
+            const h = canvas.height;
+            covers = [
+                { x: w * 0.08, y: h * 0.42, w: 110, h: 95, color: '#c29b62', name: 'Crate A' },
+                { x: w * 0.34, y: h * 0.52, w: 145, h: 85, color: '#a37d46', name: 'Boxes B' },
+                { x: w * 0.62, y: h * 0.40, w: 120, h: 105, color: '#c29b62', name: 'Mid Cover' },
+                { x: w * 0.83, y: h * 0.58, w: 130, h: 90, color: '#8f6832', name: 'Site Box' }
+            ];
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        window.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target === canvas || e.target.id === 'sniper-scope-layer') {
+                isMouseDown = true;
+                shootCurrentWeapon();
+            }
+        });
+
+        window.addEventListener('mouseup', () => { isMouseDown = false; });
+
+        window.addEventListener('keydown', (e) => {
+            if (!isPlaying) return;
+            const key = e.key;
+
+            if (key.toLowerCase() === 'r') {
+                reloadWeapon();
+            } else if (key.toLowerCase() === 'b') {
+                toggleShop();
+            } else {
+                // Find weapon by bound number key
+                Object.keys(WEAPONS).forEach(wKey => {
+                    if (WEAPONS[wKey].key === key && WEAPONS[wKey].bought) {
+                        selectWeapon(wKey);
+                    }
+                });
+            }
+        });
+
+        function toggleShop() {
+            const overlay = document.getElementById('shop-overlay');
+            if (overlay.classList.contains('hidden')) {
+                renderShopItems();
+                overlay.classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function filterShopCategory(cat) {
+            activeCategoryFilter = cat;
+            document.querySelectorAll('#category-tabs button').forEach(btn => {
+                btn.classList.remove('bg-amber-500', 'text-black', 'active');
+                btn.classList.add('bg-gray-800', 'text-gray-300');
+            });
+            event.target.classList.remove('bg-gray-800', 'text-gray-300');
+            event.target.classList.add('bg-amber-500', 'text-black', 'active');
+            renderShopItems();
+        }
+
+        function renderShopItems() {
+            const container = document.getElementById('shop-items-container');
+            document.getElementById('shop-money-display').innerText = `$${money}`;
+            container.innerHTML = '';
+
+            Object.keys(WEAPONS).forEach(key => {
+                const w = WEAPONS[key];
+
+                if (activeCategoryFilter !== 'all' && w.category !== activeCategoryFilter) {
+                    return;
+                }
+
+                const isCurrent = activeWeaponKey === key;
+                const itemDiv = document.createElement('div');
+                
+                itemDiv.className = `p-4 rounded-xl border flex flex-col justify-between transition ${
+                    isCurrent ? 'bg-amber-950/40 border-amber-500 shadow-lg' : 'bg-gray-800/90 border-gray-700/80 hover:border-gray-600'
+                }`;
+
+                let actionBtn = '';
+                if (w.bought) {
+                    if (isCurrent) {
+                        actionBtn = `<span class="w-full text-center text-xs font-black text-amber-400 bg-amber-950/80 border border-amber-500/50 py-2 rounded-lg">ТАҢДАУЛЫ ҚАРОУ</span>`;
+                    } else {
+                        actionBtn = `<button onclick="selectWeapon('${key}'); toggleShop();" class="w-full bg-amber-600 hover:bg-amber-500 text-black font-black py-2 rounded-lg text-xs transition shadow">ТАҢДАУ ${w.key ? '(' + w.key + ')' : ''}</button>`;
+                    }
+                } else {
+                    const canAfford = money >= w.price;
+                    actionBtn = `<button onclick="buyWeapon('${key}')" ${!canAfford ? 'disabled' : ''} class="w-full ${
+                        canAfford ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                    } font-black py-2 rounded-lg text-xs transition shadow">САТЫП АЛУ ($${w.price})</button>`;
+                }
+
+                itemDiv.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <span class="font-black text-white text-base block leading-tight">${w.name}</span>
+                                <span class="text-[10px] text-amber-400 uppercase font-bold tracking-wider">${w.category}</span>
+                            </div>
+                            ${w.key ? `<span class="bg-gray-900 border border-gray-700 text-amber-400 font-mono text-[11px] px-2 py-0.5 rounded font-bold">[${w.key}]</span>` : ''}
+                        </div>
+                        <div class="text-xs text-gray-300 space-y-1 mb-4 bg-gray-950/50 p-2.5 rounded-lg border border-gray-800">
+                            <div class="flex justify-between"><span>Зақым:</span> <span class="text-amber-400 font-bold">${w.damage} ${w.isPellet ? 'x' + w.pellets : ''}</span></div>
+                            <div class="flex justify-between"><span>Магазин:</span> <span class="text-gray-200 font-bold">${w.maxAmmo} оқ</span></div>
+                            <div class="flex justify-between"><span>Ату жылдамдығы:</span> <span class="text-gray-200 font-bold">${w.fireRate} ms</span></div>
+                            <div class="flex justify-between"><span>Бағасы:</span> <span class="text-green-400 font-black">${w.price === 0 ? 'Тегін' : '$' + w.price}</span></div>
+                        </div>
+                    </div>
+                    ${actionBtn}
+                `;
+                container.appendChild(itemDiv);
+            });
+        }
+
+        function buyWeapon(key) {
+            const w = WEAPONS[key];
+            if (money >= w.price && !w.bought) {
+                money -= w.price;
+                w.bought = true;
+                updateUI();
+                selectWeapon(key);
+                renderShopItems();
+            }
+        }
+
+        function selectWeapon(key) {
+            const w = WEAPONS[key];
+            if (!w || !w.bought) return;
+            
+            activeWeaponKey = key;
+            const scopeLayer = document.getElementById('sniper-scope-layer');
+            if (w.isSniper) {
+                scopeLayer.style.display = 'block';
+            } else {
+                scopeLayer.style.display = 'none';
+            }
+            updateUI();
+        }
+
+        function reloadWeapon() {
+            const w = WEAPONS[activeWeaponKey];
+            if (isReloading || w.currentAmmo === w.maxAmmo) return;
+
+            isReloading = true;
+            AudioSys.playReload();
+            document.getElementById('ammo-val').innerText = '...';
+
+            setTimeout(() => {
+                w.currentAmmo = w.maxAmmo;
+                isReloading = false;
+                updateUI();
+            }, w.reloadTime);
+        }
+
+        function shootCurrentWeapon() {
+            if (!isPlaying || isReloading) return;
+            const now = Date.now();
+            const w = WEAPONS[activeWeaponKey];
+
+            if (now - lastShotTime < w.fireRate) return;
+            
+            if (w.currentAmmo <= 0) {
+                reloadWeapon();
+                return;
+            }
+
+            // Perform shot
+            w.currentAmmo--;
+            lastShotTime = now;
+            AudioSys.playShoot(w.audio);
+            updateUI();
+
+            // Flash effect
+            muzzleFlashes.push({
+                x: mousePos.x,
+                y: mousePos.y,
+                radius: w.isSniper ? 28 : (w.isPellet ? 24 : 14),
+                alpha: 1.0
+            });
+
+            // Handle Shotgun Pellet Spread or Single Bullet
+            const shotCount = w.isPellet ? w.pellets : 1;
+            
+            for (let s = 0; s < shotCount; s++) {
+                const offsetX = w.isPellet ? (Math.random() - 0.5) * 45 : 0;
+                const offsetY = w.isPellet ? (Math.random() - 0.5) * 45 : 0;
+                const targetX = mousePos.x + offsetX;
+                const targetY = mousePos.y + offsetY;
+
+                let hit = false;
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    const enemy = enemies[i];
+                    const dist = Math.hypot(targetX - enemy.x, targetY - enemy.y);
+                    
+                    if (dist < enemy.radius) {
+                        hit = true;
+                        enemy.hp -= w.damage;
+                        AudioSys.playHit();
+
+                        createParticles(targetX, targetY, '#dc2626', 6);
+
+                        if (enemy.hp <= 0) {
+                            score += enemy.killReward;
+                            money += enemy.killReward;
+                            totalEarned += enemy.killReward;
+                            totalKills++;
+
+                            showFloatingText(`+$${enemy.killReward}`, enemy.x, enemy.y, '#22c55e');
+                            createParticles(enemy.x, enemy.y, '#b91c1c', 16);
+                            enemies.splice(i, 1);
+                        }
+                        break;
+                    }
+                }
+
+                if (!hit) {
+                    createParticles(targetX, targetY, '#d97706', 3);
+                }
+            }
+        }
+
+        function showFloatingText(text, x, y, color = '#22c55e') {
+            const container = document.getElementById('floating-container');
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.innerText = text;
+            el.style.color = color;
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        function updateUI() {
+            const w = WEAPONS[activeWeaponKey];
+            document.getElementById('health-val').innerText = health;
+            document.getElementById('money-val').innerText = money;
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('weapon-name').innerText = w.name;
+            document.getElementById('ammo-val').innerText = isReloading ? '...' : w.currentAmmo;
+            document.getElementById('max-ammo-val').innerText = w.maxAmmo;
+        }
+
+        function spawnEnemy() {
+            if (enemies.length >= 7) return;
+
+            const cover = covers[Math.floor(Math.random() * covers.length)];
+            const isFast = Math.random() < 0.35;
+
+            const enemy = {
+                x: cover.x + 20 + Math.random() * (cover.w - 40),
+                y: cover.y - 20,
+                radius: 22,
+                hp: isFast ? 70 : 120,
+                maxHp: isFast ? 70 : 120,
+                isFast: isFast,
+                killReward: isFast ? 450 : 300,
+                shootTimer: 0,
+                shootDelay: isFast ? 1100 : 1700
+            };
+
+            enemies.push(enemy);
+        }
+
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 7,
+                    vy: (Math.random() - 0.5) * 7,
+                    radius: Math.random() * 3 + 2,
+                    color: color,
+                    alpha: 1.0
+                });
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (!isPlaying) return;
+
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            if (isMouseDown && WEAPONS[activeWeaponKey].automatic) {
+                shootCurrentWeapon();
+            }
+
+            spawnTimer += dt;
+            if (spawnTimer >= spawnInterval) {
+                spawnEnemy();
+                spawnTimer = 0;
+                spawnInterval = Math.max(650, spawnInterval - 12);
+            }
+
+            updateGame(dt);
+            drawGame();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateGame(dt) {
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                e.shootTimer += dt;
+                
+                if (e.shootTimer >= e.shootDelay) {
+                    health -= e.isFast ? 14 : 10;
+                    AudioSys.playHit();
+                    e.shootTimer = 0;
+                    updateUI();
+
+                    if (health <= 0) {
+                        endGame();
+                        return;
+                    }
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy;
+                p.alpha -= 0.035;
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+
+            for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
+                const m = muzzleFlashes[i];
+                m.alpha -= 0.18;
+                if (m.alpha <= 0) muzzleFlashes.splice(i, 1);
+            }
+        }
+
+        function drawGame() {
+            // Sand CS Dust2 Map background
+            ctx.fillStyle = '#e5c494';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Shadow / Ground detailing
+            ctx.fillStyle = '#d4af78';
+            ctx.fillRect(0, canvas.height * 0.75, canvas.width, canvas.height * 0.25);
+
+            // Draw Covers / Crates
+            covers.forEach(c => {
+                ctx.fillStyle = c.color;
+                ctx.fillRect(c.x, c.y, c.w, c.h);
+                ctx.strokeStyle = '#523a1a';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(c.x, c.y, c.w, c.h);
+                
+                // Cross lines pattern
+                ctx.beginPath();
+                ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + c.w, c.y + c.h);
+                ctx.moveTo(c.x + c.w, c.y); ctx.lineTo(c.x, c.y + c.h);
+                ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+                ctx.stroke();
+            });
+
+            // Draw Terrorists
+            enemies.forEach(e => {
+                ctx.fillStyle = e.isFast ? '#dc2626' : '#451a03';
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Mask detail
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(e.x - 10, e.y - 4, 20, 6);
+
+                // Enemy HP Bar
+                const barW = 38;
+                const barH = 5;
+                const hpPct = e.hp / e.maxHp;
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(e.x - barW / 2, e.y - e.radius - 12, barW, barH);
+                ctx.fillStyle = hpPct > 0.5 ? '#22c55e' : '#ef4444';
+                ctx.fillRect(e.x - barW / 2, e.y - e.radius - 12, barW * hpPct, barH);
+            });
+
+            // Draw Blood/Dust Particles
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Draw Muzzle Flashes
+            muzzleFlashes.forEach(m => {
+                ctx.save();
+                ctx.globalAlpha = m.alpha;
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Draw Dynamic Crosshair (if non-sniper)
+            if (!WEAPONS[activeWeaponKey].isSniper) {
+                ctx.strokeStyle = '#00ff66';
+                ctx.lineWidth = 2;
+                const cx = mousePos.x;
+                const cy = mousePos.y;
+                const len = 9;
+
+                ctx.beginPath();
+                ctx.moveTo(cx - len, cy); ctx.lineTo(cx + len, cy);
+                ctx.moveTo(cx, cy - len); ctx.lineTo(cx, cy + len);
+                ctx.stroke();
+            }
+        }
+
+        function startGame() {
+            AudioSys.init();
+            isPlaying = true;
+            score = 0;
+            money = 800;
+            health = 100;
+            totalKills = 0;
+            totalEarned = 800;
+            spawnInterval = 1500;
+            enemies = [];
+            particles = [];
+
+            Object.keys(WEAPONS).forEach(k => {
+                WEAPONS[k].currentAmmo = WEAPONS[k].maxAmmo;
+                if (k !== 'glock') WEAPONS[k].bought = false;
+            });
+
+            selectWeapon('glock');
+            updateUI();
+
+            document.getElementById('game-modal').classList.add('hidden');
+            document.getElementById('shop-overlay').classList.add('hidden');
+
+            resizeCanvas();
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            isPlaying = false;
+            document.getElementById('modal-title').innerText = 'ОЙЫН АЯҚТАЛДЫ';
+            document.getElementById('modal-desc').innerText = 'Лаңкестер сізді жеңді!';
+            
+            document.getElementById('stat-score').innerText = score;
+            document.getElementById('stat-kills').innerText = totalKills;
+            document.getElementById('stat-money').innerText = `$${totalEarned}`;
+            document.getElementById('final-stats').classList.remove('hidden');
+
+            document.getElementById('start-btn').innerHTML = '<i class="fa-solid fa-rotate-right"></i> ҚАЙТА БАСТАУ';
+            document.getElementById('game-modal').classList.remove('hidden');
+        }
+
+        window.onload = () => {
+            resizeCanvas();
+        };
+    </script>
+</body>
+</html>
